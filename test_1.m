@@ -10,7 +10,7 @@ for i=1:size(samp,1)
 end
 R = sumR/size(samp,1);
 %计算互相关向量P
-P = mean(samp(:,1:2).*samp(:,3));
+P = mean(samp(:,1:2).*repmat(samp(:,3),[1,2]));
 %计算最佳权值向量Wstar
 Wstar = P*R^-1;
 %最小均方误差Emin
