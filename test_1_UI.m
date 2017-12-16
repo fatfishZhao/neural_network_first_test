@@ -59,10 +59,14 @@ handles.output = hObject;
 guidata(hObject, handles);
 load('lms_samp','samp');
 load('lms_tstsamp.mat','tstsamp');
-global Emin samp tstsamp W_SGD W_SGD_mini;
-Emin = 0.2623;%提前声明Emin
-W_SGD = [1,1];%初始化
-W_SGD_mini = [1,1];%初始化
+global Emin X Y testX testY W_SGD W_SGD_mini;
+X = [ones(size(samp,1),1),samp(:,1:2)];
+Y = samp(:,3);
+testX = [ones(size(tstsamp,1),1),tstsamp(:,1:2)];
+testY = tstsamp(:,3);
+Emin = 0.2617;%提前声明Emin
+W_SGD = [1,1,1];%初始化
+W_SGD_mini = [1,1,1];%初始化
 
 % UIWAIT makes test_1_UI wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
@@ -132,33 +136,33 @@ function pushbutton2_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 disp('请等待')
 method = get(get(handles.uibuttongroup2,'SelectedObject'), 'String');
-global Emin samp W_SGD W_SGD_mini;
-SColor = zeros(size(samp,1),3);
-SColor(samp(:,3)==1,3) = 1;
-SColor(samp(:,3)==-1,1) = 1;
+global Emin W_SGD W_SGD_mini X Y;
+SColor = zeros(size(X,1),3);
+SColor(Y==1,3) = 1;
+SColor(Y==-1,1) = 1;
 switch method
     case 'LMS'
         %计算自相关矩阵R
-        sumR = [0,0;0,0];
-        for i=1:size(samp,1)
-            sumR = sumR + samp(i,1:2)'*samp(i,1:2);
+        sumR = zeros(3);
+        for i=1:size(X,1)
+            sumR = sumR + X(i,:)'*X(i,:);
         end
-        R = sumR/size(samp,1);
+        R = sumR/size(X,1);
         %计算互相关向量P
-        P = mean(samp(:,1:2).*repmat(samp(:,3),[1,2]));
+        P = mean(X(:,:).*repmat(Y,[1,3]));
         %计算最佳权值向量Wstar
         Wstar = P*R^-1;
         %最小均方误差Emin
         neural_a = neural_2(Wstar);
         errorSum = 0;
-        for i=1:size(samp,1)
-            y = neural_a.goThrough(samp(i,1:2));
-            errorSum = errorSum + (y-samp(i,3))^2;
+        for i=1:size(X,1)
+            y = neural_a.goThrough(X(i,:));
+            errorSum = errorSum + (y-Y(i,1))^2;
         end
-        Emin = errorSum/size(samp,1);
+        Emin = errorSum/size(X,1);
         set(handles.text2,'String',['最小均方误差为',num2str(Emin)]);
-        scatter(handles.axes1,samp(:,1),samp(:,2),5,SColor);
-        line(handles.axes1,[-4,4],[4*Wstar(1)/Wstar(2),-4*Wstar(1)/Wstar(2)]);
+        scatter(handles.axes1,X(:,2),X(:,3),5,SColor);
+        line(handles.axes1,[-4,4],[(4*Wstar(2)-Wstar(1))/Wstar(3),(-4*Wstar(2)-Wstar(1))/Wstar(3)]);
     case '随机逼近算法'
         alpha = str2double(get(handles.edit1,'String'));
         set(handles.text2,'String','');
@@ -167,11 +171,11 @@ switch method
             alpha = 0.01;
         end
         Estop = Emin+0.001;
-        [W_SGD,Elog] = SGD_mini(samp(:,1:2),samp(:,3),alpha,Estop,1);
+        [W_SGD,Elog] = SGD_mini(X,Y,alpha,Estop,1);
         set(handles.axes2,'NextPlot','add');
         plot(handles.axes2,Elog,'DisplayName',['alpha = ',num2str(alpha)]);legend('show')
-        scatter(handles.axes1,samp(:,1),samp(:,2),5,SColor);
-        line(handles.axes1,[-4,4],[4*W_SGD(1)/W_SGD(2),-4*W_SGD(1)/W_SGD(2)]);
+        scatter(handles.axes1,X(:,2),X(:,3),5,SColor);
+        line(handles.axes1,[-4,4],[(4*W_SGD(2)-W_SGD(1))/W_SGD(3),(-4*W_SGD(2)-W_SGD(1))/W_SGD(3)]);
         set(handles.text2,'String',[get(handles.text2,'String'),'W为',num2str(W_SGD)]);
         %kk
     case '基于统计的算法'
@@ -189,11 +193,11 @@ switch method
             P = 5;
         end
         Estop = Emin+0.001;
-        [W_SGD_mini,Elog] = SGD_mini(samp(:,1:2),samp(:,3),alpha,Estop,P);
+        [W_SGD_mini,Elog] = SGD_mini(X,Y,alpha,Estop,P);
         set(handles.axes2,'NextPlot','add');
         plot(handles.axes2,Elog,'DisplayName',['alpha = ',num2str(alpha),',P=',num2str(P)]);legend('show')
-        scatter(handles.axes1,samp(:,1),samp(:,2),5,SColor);
-        line(handles.axes1,[-4,4],[4*W_SGD_mini(1)/W_SGD_mini(2),-4*W_SGD_mini(1)/W_SGD_mini(2)]);
+        scatter(handles.axes1,X(:,2),X(:,3),5,SColor);
+        line(handles.axes1,[-4,4],[(4*W_SGD_mini(2)-W_SGD_mini(1))/W_SGD_mini(3),(-4*W_SGD_mini(2)-W_SGD_mini(1))/W_SGD_mini(3)]);
         set(handles.text2,'String',[get(handles.text2,'String'),'W为',num2str(W_SGD_mini)]);
     case 'Widrow'
         alpha = str2double(get(handles.edit1,'String'));
@@ -203,12 +207,12 @@ switch method
             alpha=0.1;
         end
         Estop = Emin+0.001;
-        P = size(samp,1);
-        [W_SGD_mini,Elog] = SGD_mini(samp(:,1:2),samp(:,3),alpha,Estop,P);
+        P = size(X,1);
+        [W_SGD_mini,Elog] = SGD_mini(X,Y,alpha,Estop,P);
         set(handles.axes2,'NextPlot','add');
         plot(handles.axes2,Elog,'DisplayName',['alpha = ',num2str(alpha),',P=',num2str(P)]);legend('show')
-        scatter(handles.axes1,samp(:,1),samp(:,2),5,SColor);
-        line(handles.axes1,[-4,4],[4*W_SGD_mini(1)/W_SGD_mini(2),-4*W_SGD_mini(1)/W_SGD_mini(2)]);
+        scatter(handles.axes1,X(:,2),X(:,3),5,SColor);
+        line(handles.axes1,[-4,4],[(4*W_SGD_mini(2)-W_SGD_mini(1))/W_SGD_mini(3),(-4*W_SGD_mini(2)-W_SGD_mini(1))/W_SGD_mini(3)]);
         set(handles.text2,'String',[get(handles.text2,'String'),'W为',num2str(W_SGD_mini)]);
     otherwise
         error('方法选择出错')
@@ -221,15 +225,15 @@ function pushbutton3_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton2 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-global tstsamp W_SGD;
-SColor = zeros(size(tstsamp,1),3);
-SColor(tstsamp(:,3)==1,3) = 1;
-SColor(tstsamp(:,3)==-1,1) = 1;
-scatter(handles.axes1,tstsamp(:,1),tstsamp(:,2),5,SColor);
-line(handles.axes1,[-4,4],[4*W_SGD(1)/W_SGD(2),-4*W_SGD(1)/W_SGD(2)]);
+global W_SGD testX testY;
+SColor = zeros(size(testX,1),3);
+SColor(testY==1,3) = 1;
+SColor(testY==-1,1) = 1;
+scatter(handles.axes1,testX(:,2),testX(:,3),5,SColor);
+line(handles.axes1,[-4,4],[(4*W_SGD(2)-W_SGD(1))/W_SGD(3),(-4*W_SGD(2)-W_SGD(1))/W_SGD(3)]);
 neural_SGD = neural_2(W_SGD);
-Y_SGD = neural_SGD.goThrough_th(tstsamp(:,1:2));
-set(handles.text2,'String',['随机梯度下降法正确率是',num2str(1-size(find(tstsamp(:,3)'~=Y_SGD),2)/size(tstsamp,1))]);
+Y_SGD = neural_SGD.goThrough_th(testX);
+set(handles.text2,'String',['随机梯度下降法正确率是',num2str(1-size(find(testY'~=Y_SGD),2)/size(testX,1))]);
 
 
 
@@ -238,15 +242,15 @@ function pushbutton4_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton2 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-global tstsamp W_SGD_mini;
-SColor = zeros(size(tstsamp,1),3);
-SColor(tstsamp(:,3)==1,3) = 1;
-SColor(tstsamp(:,3)==-1,1) = 1;
-scatter(handles.axes1,tstsamp(:,1),tstsamp(:,2),5,SColor);
-line(handles.axes1,[-4,4],[4*W_SGD_mini(1)/W_SGD_mini(2),-4*W_SGD_mini(1)/W_SGD_mini(2)]);
+global tstsamp W_SGD_mini testX testY;
+SColor = zeros(size(testX,1),3);
+SColor(testY==1,3) = 1;
+SColor(testY==-1,1) = 1;
+scatter(handles.axes1,testX(:,2),testX(:,3),5,SColor);
+line(handles.axes1,[-4,4],[(4*W_SGD_mini(2)-W_SGD_mini(1))/W_SGD_mini(3),(-4*W_SGD_mini(2)-W_SGD_mini(1))/W_SGD_mini(3)]);
 neural_SGD = neural_2(W_SGD_mini);
-Y_SGD_mini = neural_SGD.goThrough_th(tstsamp(:,1:2));
-set(handles.text2,'String',['统计梯度下降法正确率是',num2str(1-size(find(tstsamp(:,3)'~=Y_SGD_mini),2)/size(tstsamp,1))]);
+Y_SGD_mini = neural_SGD.goThrough_th(testX);
+set(handles.text2,'String',['统计梯度下降法正确率是',num2str(1-size(find(testY'~=Y_SGD_mini),2)/size(testX,1))]);
 
 
 
